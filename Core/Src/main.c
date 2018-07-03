@@ -52,7 +52,7 @@
 #include "cmsis_os.h"
 
 /* USER CODE BEGIN Includes */
-
+#include "zaxis.h"
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
@@ -64,7 +64,7 @@ osThreadId defaultTaskHandle;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-
+osThreadId PeriodicityTaskHandle;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -79,7 +79,8 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-
+void PeriodicityTask(void const * argument);
+static void CAN_Filter_Init(void);
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -118,7 +119,13 @@ int main(void)
   MX_CAN_Init();
   MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-
+  CAN_Filter_Init();
+  HAL_CAN_Receive_IT(&hcan, CAN_FIFO0);
+  HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2);
+	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_3);
+	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_4);
+  ZAxis_Init();
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -140,6 +147,8 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+  osThreadDef(task1, PeriodicityTask, osPriorityRealtime, 0, 256);
+  PeriodicityTaskHandle = osThreadCreate(osThread(task1), NULL);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -318,7 +327,54 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+CanTxMsgTypeDef txmsg;
+CanRxMsgTypeDef rxmsg;
+static void CAN_Filter_Init(void)
+{    
+  hcan.pTxMsg = &txmsg;
+  hcan.pTxMsg->ExtId = 2;
+  hcan.pTxMsg->DLC = 8;
+  hcan.pTxMsg->IDE = CAN_ID_EXT;
+  hcan.pTxMsg->RTR = CAN_RTR_DATA;    
+  
+  hcan.pRxMsg = &rxmsg;  
+  hcan.pRxMsg->ExtId = 1;
+  hcan.pRxMsg->DLC = 8;
+  hcan.pRxMsg->IDE = CAN_ID_EXT;
+  hcan.pRxMsg->RTR = CAN_RTR_DATA;    
+  
+  CAN_FilterConfTypeDef  sFilterConfig;  
+  
+  sFilterConfig.FilterNumber = 0;                       //使用过滤器0  
+  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;     //掩码模式
+  sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;    //配置为32位宽  
+  sFilterConfig.FilterIdHigh = 0; 
+  sFilterConfig.FilterIdLow = 0|CAN_ID_STD;             //设置IDE位为0  
+  sFilterConfig.FilterMaskIdHigh = 0x00;     
+  sFilterConfig.FilterMaskIdLow = 0x00;                 //全部为0，所有的ID都能通过，不过滤
+  sFilterConfig.FilterFIFOAssignment = 0;               //接收到的报文放入到FIFO0中  
+  sFilterConfig.FilterActivation = ENABLE;  
+  sFilterConfig.BankNumber = 14;  
+  
+  HAL_CAN_ConfigFilter(&hcan, &sFilterConfig);
+  
+  return;
+}
 
+void PeriodicityTask(void const * argument)
+{
+    static TickType_t xLastWakeTime;
+    const TickType_t xTimeIncrement = pdMS_TO_TICKS(1);
+
+    xLastWakeTime = xTaskGetTickCount();       
+    for(;;)
+    {              
+        vTaskDelayUntil(&xLastWakeTime,xTimeIncrement);
+
+        SwitchScan();        
+        //osDelay(1);
+    }
+}
 /* USER CODE END 4 */
 
 /* StartDefaultTask function */

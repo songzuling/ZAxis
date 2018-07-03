@@ -1172,6 +1172,12 @@
         <name>$PROJ_DIR$\..\Core\Src\freertos.c</name>
       </file>
       <file>
+        <name>$PROJ_DIR$\..\Core\Src\key.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Core\Inc\key.h</name>
+      </file>
+      <file>
         <name>$PROJ_DIR$\..\Core\Src\main.c</name>
       </file>
       <file>
@@ -1182,6 +1188,12 @@
       </file>
       <file>
         <name>$PROJ_DIR$\..\Core\Src\stm32f1xx_it.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Core\Src\zaxis.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Core\Inc\zaxis.h</name>
       </file>
     </group>
   </group>
