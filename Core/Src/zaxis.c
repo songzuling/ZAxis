@@ -21,16 +21,23 @@ void ZAxis_Init(void)
     ZAxis.LayerSwitch[i].EventOnKeyUp = DoNothing;
   }
   
-  
+  SetDuty(&htim4,TIM_CHANNEL_1,50);
+  SetDuty(&htim4,TIM_CHANNEL_2,50);
+  SetDuty(&htim4,TIM_CHANNEL_3,50);
+  SetDuty(&htim4,TIM_CHANNEL_4,50);  
   
 }
 
 // 扫描开关
 void SwitchScan(void)
 {
+//  KeyScan(&(ZAxis.LayerSwitch[1]),1,!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0));
+//  KeyScan(&(ZAxis.LayerSwitch[2]),1,!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9));
+//  KeyScan(&(ZAxis.LayerSwitch[3]),1,!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10));  
+  
   KeyScan(&(ZAxis.LayerSwitch[1]),1,!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0));
-  KeyScan(&(ZAxis.LayerSwitch[2]),1,!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_9));
-  KeyScan(&(ZAxis.LayerSwitch[3]),1,!HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_10));  
+  KeyScan(&(ZAxis.LayerSwitch[2]),1,!HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0));
+  KeyScan(&(ZAxis.LayerSwitch[3]),1,!HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1));  
   return;
 }
 
@@ -96,7 +103,7 @@ void GoToLayer(int curLayer, int layer)
     SetMoveDirection(ZAXIS_MOVE_UP);
   }
   /*要去层等于当前层，可能正在当前层，也可能在
-    当前层上面或者下面未到达其他层的地方*/
+  当前层上面或者下面未到达其他层的地方*/
   else
   {
     /*之前向上运动，现在向下*/
@@ -114,23 +121,17 @@ void GoToLayer(int curLayer, int layer)
       
     }
   }// end if
-      /**/
+  
+  /*阻塞等待z轴到达相应层*/
+  START_ZAXIS;
   while(ZAxis.LayerSwitch[layer].IsDown == 0)
   { 
     ///////////////////////////////////////////////
     //注意添加运动过程中触底的情况判断
     ///////////////////////////////////////////////
     
-    SetDuty(&htim4,TIM_CHANNEL_1,50);
-    SetDuty(&htim4,TIM_CHANNEL_2,50);
-    SetDuty(&htim4,TIM_CHANNEL_3,50);
-    SetDuty(&htim4,TIM_CHANNEL_4,50);         
   }
-  SetDuty(&htim4,TIM_CHANNEL_1,0);
-  SetDuty(&htim4,TIM_CHANNEL_2,0);
-  SetDuty(&htim4,TIM_CHANNEL_3,0);
-  SetDuty(&htim4,TIM_CHANNEL_4,0);    
-  
+  STOP_ZAXIS;
 }
     
 void SetMoveDirection(uint8_t dir)
