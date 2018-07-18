@@ -4,7 +4,7 @@
 ZAxis_TypeDef ZAxis;
 extern TIM_HandleTypeDef htim4;
 extern CAN_HandleTypeDef hcan;
-
+static inline int32_t Abs(int32_t v);
 void ZAxis_Init(void)
 {
   
@@ -28,10 +28,18 @@ void ZAxis_Init(void)
   }
 
   ZAxis.CurrentLayer = 0;
-  STOP_ZAXIS;  
+  ZAxis.MoveDirection = 0;
+  ZAxis.MoveDistance = 0;
+  
   SET_ZAXIS_MOVE_UP;
   ENABLE_ZAXIS_DRIVER;
   SetMoveDirection(ZAXIS_MOVE_UP);
+  STOP_ZAXIS;  
+  
+  LED1_ON;
+  Delay(50);
+  LED1_OFF;
+  
 }
 
 // 扫描开关
@@ -67,7 +75,8 @@ void ZAxisMain(void)
         /*该层需要出货*/
         if(ZAxis.DeliverCellCount[i] > 0)
         {
-          GoToLayer(ZAxis.CurrentLayer, i);
+          //GoToLayer(ZAxis.CurrentLayer, i);
+          GoToLayer(ZAxis.MoveDistance, 10000);
           hcan.pTxMsg->Data[0] = CMD_ZAXIS_REACH;
           HAL_CAN_Transmit_IT(&hcan);  
           if(0 == WaitingForGoods(i, 100000))
@@ -83,7 +92,8 @@ void ZAxisMain(void)
       }// enf for
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_RESET); 
       /*接货完成，出口所在层出货*/ 
-      GoToLayer(ZAxis.CurrentLayer, LAYER_OF_OUTPUT);
+      //GoToLayer(ZAxis.CurrentLayer, LAYER_OF_OUTPUT);
+      GoToLayer(ZAxis.MoveDistance, 0);
     }// end if
   }
 }
@@ -126,12 +136,12 @@ void GoToLayer(int curLayer, int toLayer)
   {
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET); 
     /*之前向上运动，现在向下*/
-    if(ZAxis.MoveDirection == ZAXIS_MOVE_UP)
+    if(ZAxis.LastMoveDirection == ZAXIS_MOVE_UP)
     {
       SetMoveDirection(ZAXIS_MOVE_DOWN);
     }
     /*之前向下运动，现在向上*/
-    else if(ZAxis.MoveDirection == ZAXIS_MOVE_DOWN)
+    else if(ZAxis.LastMoveDirection == ZAXIS_MOVE_DOWN)
     {
       SetMoveDirection(ZAXIS_MOVE_UP);
     }
@@ -143,31 +153,40 @@ void GoToLayer(int curLayer, int toLayer)
   
   /*阻塞等待z轴到达相应层*/
   START_ZAXIS;
-  while(ZAxis.LayerSwitch[toLayer].IsDown == 0)
-  {
-    ///////////////////////////////////////////////
-    //注意添加运动过程中触底的情况判断
-    ///////////////////////////////////////////////
-    
-  }
+//  while(ZAxis.LayerSwitch[toLayer].IsDown == 0)
+//  {
+//    ///////////////////////////////////////////////
+//    //注意添加运动过程中触底的情况判断
+//    ///////////////////////////////////////////////
+//    
+//  }
+  while( Abs(ZAxis.MoveDistance-toLayer)>10 );
   STOP_ZAXIS;
 }
-    
+ 
+
+static inline int32_t Abs(int32_t v)
+{
+  return v>0? v:-v;
+}
+
 void SetMoveDirection(uint8_t dir)
 {
   if(dir == ZAXIS_MOVE_UP)
   {
     SET_ZAXIS_MOVE_UP; 
     /*改变运动方向标志*/
-    ZAxis.MoveDirection = dir;
+    ZAxis.LastMoveDirection = dir;
+    ZAxis.MoveDirection = dir - 1;
   }
   else if(dir == ZAXIS_MOVE_DOWN)
   {
     SET_ZAXIS_MOVE_DOWN;
     /*改变运动方向标志*/
-    ZAxis.MoveDirection = dir;
+    ZAxis.LastMoveDirection = dir;
+    ZAxis.MoveDirection = dir - 1;
   }
-  else
+  else 
   {
     /*误传入其他值，忽略*/
   }    
@@ -225,6 +244,11 @@ void PraseCommand(CAN_HandleTypeDef* hcan)
     return;
 }
 
+void UpdateDistance(ZAxis_TypeDef *z)
+{
+  z->MoveDistance += z->MoveDirection;
+}
+
 void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
 {  
     HAL_CAN_Receive_IT(hcan, CAN_FIFO0);
@@ -248,4 +272,15 @@ void SetDuty(TIM_HandleTypeDef *htim, uint32_t Channel, uint32_t duty)
       default:break;
     }
     return;
+}
+
+
+
+void Delay(uint32_t ms)
+{
+  uint32_t tickstart = HAL_GetTick();
+  
+  while( HAL_GetTick() - tickstart < ms ){};
+  
+  return;
 }
